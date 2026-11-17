@@ -1,0 +1,3 @@
+- insert:
+    - id: enhance-prompt
+      name: 'dsh-enhance-prompt'
