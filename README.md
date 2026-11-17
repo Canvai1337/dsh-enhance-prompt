@@ -12,13 +12,13 @@ English: [README.en.md](README.en.md)
 
 ## 界面预览
 
-> 以下为按 1.1.0 实际界面尺寸、配色与文案制作的**模拟图**（非真机截图）。
+> 以下为**模拟图**，不是真机截图：输入框按 DSH 自身的 `InputBar` / `ModelSelect` / `PermissionSelect` / `FileCard` / `ReferenceChip` 样式表与设计 token 绘制（浅色外观），按钮与提示条按本插件 `client.js` 的样式绘制。
 
 按钮位于模型选择按钮左侧，悬停显示「增强提示词」提示：
 
 ![增强提示词按钮与提示气泡](docs/images/button-tooltip.png)
 
-草稿里放入文件时，增强只改写文字，文件仍然是可点击的芯片：
+草稿里放入文件时，增强只改写文字，文件仍然是输入框上方的文件卡片：
 
 ![带文件时的实际使用](docs/images/draft-with-file.png)
 
@@ -26,7 +26,7 @@ English: [README.en.md](README.en.md)
 
 ![增强进行中](docs/images/enhancing.png)
 
-完成后草稿被替换为分段提示词，文件芯片留在「参考资料」里，提示条上有「撤销」：
+完成后草稿被替换为分段提示词，文件引用留在「参考资料」里，提示条上有「撤销」：
 
 ![增强完成后的分段提示词](docs/images/enhanced-result.png)
 

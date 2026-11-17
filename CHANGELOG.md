@@ -18,8 +18,9 @@ All notable changes to this project are documented here.
 - Added a `notReady` guard for non-editable input states.
 
 ### Docs
-- README screenshots replaced with mockups that match the 1.1.0 layout, dark-theme tokens and copy; added `enhancing.png` and `enhanced-result.png`.
+- README screenshots replaced with mockups that match the 1.1.0 layout and copy; added `enhancing.png` and `enhanced-result.png`.
 - The mockups are reproducible: `docs/mockups/generate.cjs` draws the composer in HTML/CSS and renders it with headless Chrome.
+- Redrawn from DSH's own stylesheets and design tokens (`InputBar`, `ModelSelect`, `PermissionSelect`, `FileCard`, `ReferenceChip`, `design-platform.css`) in the light appearance, so the composer chrome — attach circle, permission chip, model trigger, blue send circle, file card rail, inline reference chip — is what DSH actually renders rather than an approximation.
 
 ## [1.0.0] - 2026-11-16
 
