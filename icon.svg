@@ -1,0 +1,10 @@
+<svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M16 7C16.9 14.1 18.9 16.1 26 17C18.9 17.9 16.9 19.9 16 27C15.1 19.9 13.1 17.9 6 17C13.1 16.1 15.1 14.1 16 7Z" fill="url(#dshEnhancePromptGradient)" />
+  <path d="M27.5 5C27.9 8.1 28.9 9.1 32 9.5C28.9 9.9 27.9 10.9 27.5 14C27.1 10.9 26.1 9.9 23 9.5C26.1 9.1 27.1 8.1 27.5 5Z" fill="url(#dshEnhancePromptGradient)" opacity="0.85" />
+  <defs>
+    <linearGradient id="dshEnhancePromptGradient" x1="6" y1="7" x2="30" y2="27" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#67C7FE" />
+      <stop offset="1" stop-color="#3F77D8" />
+    </linearGradient>
+  </defs>
+</svg>
