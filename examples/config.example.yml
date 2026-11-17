@@ -1,0 +1,20 @@
+# Example: override this plugin's row config in your profile's cordis.patch.yml.
+# The row id is `enhance-prompt` (see cordis.patch.yml); a matching entry here
+# replaces the complete config for that row.
+- id: enhance-prompt
+  name: dsh-enhance-prompt
+  config:
+    # true = sectioned output (labels + lists); false = one paragraph
+    structured: true
+    # Use the cheapest effort for a rewrite task (off / low / high / max)
+    reasoningEffort: off
+    # Optional: run enhancement on a specific, cheaper model
+    # provider: magpie
+    # model: workbuddy/deepseek-v4.1-flash
+    # Draft and output bounds
+    maxInputChars: 8000
+    maxOutputTokens: 2048
+    timeoutMs: 75000
+    # Fully custom system prompt (overrides the built-in one)
+    # system: |
+    #   You are a prompt rewriter...
