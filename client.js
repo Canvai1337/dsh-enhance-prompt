@@ -32,6 +32,9 @@ window.__ModuleLoader__.load({
       'timeout': '增强超时，请重试',
       'cancelled': '已取消增强',
       'tooLong': '草稿过长，请精简后再试',
+      'truncated': '模型输出被截断，请重试（或换用输出上限更高的模型）',
+      'modelFailed': '模型请求失败，请重试',
+      'emptyResult': '模型没有返回内容，请重试',
       'noModel': '未配置可用模型，请在设置中选择模型',
       'notReady': '当前输入状态暂不支持增强，请稍候再试',
       'done': '已替换为优化后的提示词',
@@ -53,6 +56,9 @@ window.__ModuleLoader__.load({
       'timeout': 'Enhancement timed out. Try again.',
       'cancelled': 'Enhancement cancelled',
       'tooLong': 'Draft is too long. Shorten it and try again.',
+      'truncated': 'The model output hit the token limit. Try again, or use a model with a larger output cap.',
+      'modelFailed': 'The model request failed. Try again.',
+      'emptyResult': 'The model returned nothing. Try again.',
       'noModel': 'No model is configured. Choose one in Settings.',
       'notReady': 'This input state cannot be enhanced right now; try again shortly',
       'done': 'Draft replaced with the enhanced prompt',
@@ -184,9 +190,14 @@ window.__ModuleLoader__.load({
       if (code === 'payload-too-large' || status === 413) return t('tooLong');
       if (code === 'no-model' || status === 503) return t('noModel');
       if (code === 'empty-draft') return t('empty');
-      if (code === 'output-truncated') return t('tooLong');
+      // Truncation is an output-cap problem, not a draft-length problem: telling
+      // the user to shorten the draft would not fix it.
+      if (code === 'output-truncated') return t('truncated');
+      if (code === 'empty-result') return t('emptyResult');
       if (code === 'references-lost') return t('refLost');
-      if (typeof serverMessage === 'string' && serverMessage !== '') return serverMessage.slice(0, 160);
+      // Host messages are English diagnostics; a Chinese UI must not leak them.
+      if (code === 'model-failed') return t('modelFailed');
+      if (typeof serverMessage === 'string' && serverMessage !== '') return t('failed');
       return t('failed');
     }
 
@@ -241,6 +252,8 @@ window.__ModuleLoader__.load({
       const mounted = React.useRef(true);
       const busyRef = React.useRef(false);
       const controller = React.useRef(null);
+      /** Wall clock of the current request start, for double-click throttling. */
+      const startedAt = React.useRef(0);
       const noteTimer = React.useRef(null);
       const latest = React.useRef({ draft: '', rev: -1, phase: 'plain', attachmentIds: [] });
       latest.current = { draft, rev: draftRev, phase: phaseName, attachmentIds };
@@ -306,8 +319,11 @@ window.__ModuleLoader__.load({
       };
 
       const run = () => {
-        // A second activation while busy cancels the in-flight request.
+        // A second activation while busy cancels the in-flight request, but a
+        // habitual double click must not silently cancel the work it just
+        // started, so activations inside the first 400ms are ignored.
         if (busyRef.current) {
+          if (Date.now() - startedAt.current < 400) return;
           const inflight = controller.current;
           if (inflight !== null) inflight.abort();
           return;
@@ -320,6 +336,7 @@ window.__ModuleLoader__.load({
 
         const request = new AbortController();
         let timedOut = false;
+        startedAt.current = Date.now();
         const timeout = setTimeout(() => { timedOut = true; request.abort(); }, CLIENT_TIMEOUT_MS);
         controller.current = request;
         busyRef.current = true;
@@ -391,8 +408,11 @@ window.__ModuleLoader__.load({
           onClick: run,
         }, busy ? SPINNER : SPARKLE),
         h('div', { className: 'dsh-ep-live', role: 'status', 'aria-live': 'polite' }, note === null ? '' : note.text),
-        note === null ? null : h('div', { className: 'dsh-ep-note', 'aria-hidden': 'true' },
-          h('span', { className: 'dsh-ep-note-text' }, note.text),
+        // The note stays in the accessibility tree so its Undo / Dismiss buttons
+        // are reachable; only the text is hidden because the live region above
+        // already announces it (avoids double speech).
+        note === null ? null : h('div', { className: 'dsh-ep-note' },
+          h('span', { className: 'dsh-ep-note-text', 'aria-hidden': 'true' }, note.text),
           note.undo !== undefined
             ? h('button', { type: 'button', className: 'dsh-ep-note-btn', onClick: undo }, t('undo'))
             : null,

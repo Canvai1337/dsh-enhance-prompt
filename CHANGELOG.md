@@ -17,6 +17,10 @@ All notable changes to this project are documented here.
 - Client split into pure helpers (`orderedRefs`, `splitForModel`, `rebuildSnapshot`, `restoreAttachments`, `messageFor`) plus a single controller; removed the temporary diagnostics route.
 - Added a `notReady` guard for non-editable input states.
 
+### Docs
+- README screenshots replaced with mockups that match the 1.1.0 layout, dark-theme tokens and copy; added `enhancing.png` and `enhanced-result.png`.
+- The mockups are reproducible: `docs/mockups/generate.cjs` draws the composer in HTML/CSS and renders it with headless Chrome.
+
 ## [1.0.0] - 2026-11-16
 
 ### Added

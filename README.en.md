@@ -12,6 +12,8 @@ A DeepSeek Harness (DSH) Web GUI plugin. It adds a ✨ icon button to the compos
 
 ## Screenshots
 
+> These are **mockups** drawn at the 1.1.0 layout, colors and copy — not live screenshots.
+
 The button sits to the left of the model selector; hover shows the "Enhance prompt" tooltip:
 
 ![Enhance prompt button and tooltip](docs/images/button-tooltip.png)
@@ -19,6 +21,14 @@ The button sits to the left of the model selector; hover shows the "Enhance prom
 With a file attached, only the text is rewritten — the file stays a clickable chip:
 
 ![Actual usage with an attached file](docs/images/draft-with-file.png)
+
+While the request runs the icon becomes a spinner; a second click after 400 ms cancels it:
+
+![Enhancement in progress](docs/images/enhancing.png)
+
+When it finishes the draft becomes a sectioned prompt, the file chip moves under "References", and the note offers Undo:
+
+![Sectioned prompt after enhancement](docs/images/enhanced-result.png)
 
 ---
 

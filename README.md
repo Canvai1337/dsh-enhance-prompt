@@ -12,6 +12,8 @@ English: [README.en.md](README.en.md)
 
 ## 界面预览
 
+> 以下为按 1.1.0 实际界面尺寸、配色与文案制作的**模拟图**（非真机截图）。
+
 按钮位于模型选择按钮左侧，悬停显示「增强提示词」提示：
 
 ![增强提示词按钮与提示气泡](docs/images/button-tooltip.png)
@@ -19,6 +21,14 @@ English: [README.en.md](README.en.md)
 草稿里放入文件时，增强只改写文字，文件仍然是可点击的芯片：
 
 ![带文件时的实际使用](docs/images/draft-with-file.png)
+
+请求进行中按钮变成转圈，再点一次（400ms 之后）可取消：
+
+![增强进行中](docs/images/enhancing.png)
+
+完成后草稿被替换为分段提示词，文件芯片留在「参考资料」里，提示条上有「撤销」：
+
+![增强完成后的分段提示词](docs/images/enhanced-result.png)
 
 ---
 
