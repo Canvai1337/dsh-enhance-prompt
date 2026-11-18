@@ -8,6 +8,11 @@
  * rebuilt as reference chips on writeback; images and files stay in the
  * composer's attachment rail and are restored if a draft swap drops them.
  * An Undo action restores the exact original draft.
+ *
+ * Every failure path names its cause: the Host reports a code, this half maps
+ * it to localized copy, and transport-level failures (auth, missing route,
+ * non-JSON body, timeout) get their own messages instead of a generic retry
+ * hint the user cannot act on.
  */
 window.__ModuleLoader__.load({
   id: 'dsh-enhance-prompt',
@@ -17,8 +22,14 @@ window.__ModuleLoader__.load({
 
     const NS = 'enhancePrompt';
     const ROUTE = '__local/enhance-prompt';
-    /** Client deadline, shorter than the Host's model timeout. */
-    const CLIENT_TIMEOUT_MS = 60000;
+    /**
+     * Client deadline. It must outlive the Host's own per-attempt timeout times
+     * its attempt count, otherwise the browser gives up first and reports a
+     * timeout for work the Host would have finished (or explained). The Host
+     * makes three attempts, so 300 s covers the shipped 75 s default and the
+     * 90 s a profile may raise it to.
+     */
+    const CLIENT_TIMEOUT_MS = 300000;
     /** Whole-state selector; a stable identity avoids resubscribing each render. */
     const selectAll = s => s;
 
@@ -39,10 +50,14 @@ window.__ModuleLoader__.load({
       'notReady': '当前输入状态暂不支持增强，请稍候再试',
       'done': '已替换为优化后的提示词',
       'kept': '已增强文字，文件与引用保持原样',
+      'unchanged': '模型没有改写内容，草稿未改动',
       'changed': '草稿已改变，未覆盖你的输入',
       'refLost': '模型未保留文件引用，已取消替换，原草稿未改动',
       'refUnsupported': '当前草稿结构暂不支持增强',
       'commandMode': '命令模式下暂不支持增强提示词',
+      'unauthorized': '登录状态已失效，请刷新页面后重试',
+      'noRoute': '增强接口不可用，请重启 DSH 后重试',
+      'offline': '连接已断开，请检查 DSH 是否仍在运行',
       'undo': '撤销',
       'dismiss': '关闭',
     };
@@ -63,10 +78,14 @@ window.__ModuleLoader__.load({
       'notReady': 'This input state cannot be enhanced right now; try again shortly',
       'done': 'Draft replaced with the enhanced prompt',
       'kept': 'Text enhanced; files and references kept as-is',
+      'unchanged': 'The model made no change; draft left as it was',
       'changed': 'Draft changed while enhancing; nothing was replaced',
       'refLost': 'The model dropped a file reference; replacement cancelled, draft unchanged',
       'refUnsupported': 'This draft structure cannot be enhanced yet',
       'commandMode': 'Enhance prompt is unavailable in command mode',
+      'unauthorized': 'Your session expired. Refresh the page and try again.',
+      'noRoute': 'The enhance endpoint is unavailable. Restart DSH and try again.',
+      'offline': 'The connection dropped. Check that DSH is still running.',
       'undo': 'Undo',
       'dismiss': 'Dismiss',
     };
@@ -76,6 +95,8 @@ window.__ModuleLoader__.load({
 
     const MARK_OF = index => `[[DSH_REF_${index}]]`;
     const ANY_MARK = /\[\[DSH_REF_\d+\]\]/u;
+    /** The Host canonicalizes markers; this mirror keeps client-side checks tolerant. */
+    const ANY_MARK_LOOSE = /[[【⟦]\s*DSH[\s_-]*REF[\s_-]*\d+\s*[\]】⟧]/iu;
 
     // --- Pure helpers (no React, unit-tested offline) -----------------------
 
@@ -150,7 +171,7 @@ window.__ModuleLoader__.load({
         rest = rest.slice(index + mark.length);
       }
       textParts.push(rest);
-      if (textParts.some(part => ANY_MARK.test(part))) return null;
+      if (textParts.some(part => ANY_MARK.test(part) || ANY_MARK_LOOSE.test(part))) return null;
 
       let text = '';
       const references = [];
@@ -185,8 +206,17 @@ window.__ModuleLoader__.load({
       else setTimeout(fn, 0);
     }
 
+    /** Compare drafts ignoring the whitespace the model re-flows around sections. */
+    function sameDraft(a, b) {
+      const squeeze = value => String(value).replace(/\s+/gu, ' ').trim();
+      return squeeze(a) === squeeze(b);
+    }
+
     /** Map a Host failure to a localized message. */
     function messageFor(code, status, serverMessage, t) {
+      if (status === 401 || status === 403) return t('unauthorized');
+      if (status === 404 || status === 405) return t('noRoute');
+      if (status === 504 || code === 'timeout') return t('timeout');
       if (code === 'payload-too-large' || status === 413) return t('tooLong');
       if (code === 'no-model' || status === 503) return t('noModel');
       if (code === 'empty-draft') return t('empty');
@@ -208,6 +238,7 @@ window.__ModuleLoader__.load({
       '.dsh-ep-btn{position:relative;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;padding:0;border:none;border-radius:999px;background:transparent;color:var(--dsw-alias-label-secondary,#9a9a9a);cursor:pointer;outline:none;}',
       '@media (hover:hover){.dsh-ep-btn:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(127,127,127,.14));color:var(--dsw-alias-label-primary,CanvasText);}}',
       '.dsh-ep-btn:focus-visible{box-shadow:0 0 0 2px var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary,#4f7bd8));}',
+      '.dsh-ep-btn[aria-busy="true"]{color:var(--dsw-alias-state-business-primary,#4f7bd8);}',
       '.dsh-ep-btn::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);padding:4px 8px;border-radius:6px;white-space:nowrap;font-size:12px;line-height:18px;background:var(--dsw-alias-bg-overlay,Canvas);color:var(--dsw-alias-label-primary,CanvasText);border:1px solid var(--dsw-alias-border-l1,rgba(127,127,127,.35));box-shadow:0 4px 16px rgba(0,0,0,.18);opacity:0;visibility:hidden;pointer-events:none;transition:opacity 120ms ease;z-index:1100;}',
       '@media (hover:hover){.dsh-ep-btn:hover::after{opacity:1;visibility:visible;}}',
       '.dsh-ep-btn:focus-visible::after{opacity:1;visibility:visible;}',
@@ -216,7 +247,8 @@ window.__ModuleLoader__.load({
       '.dsh-ep-spin{animation:dsh-ep-spin .9s linear infinite;transform-origin:center;}',
       '@media (prefers-reduced-motion:reduce){.dsh-ep-spin{animation:none;}}',
       '.dsh-ep-live{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;}',
-      '.dsh-ep-note{position:absolute;bottom:calc(100% + 8px);right:0;z-index:1100;display:flex;align-items:center;gap:8px;max-width:min(300px,70vw);padding:6px 8px 6px 10px;border-radius:8px;font-size:12px;line-height:18px;background:var(--dsw-alias-bg-overlay,Canvas);color:var(--dsw-alias-label-primary,CanvasText);border:1px solid var(--dsw-alias-border-l1,rgba(127,127,127,.35));box-shadow:0 4px 16px rgba(0,0,0,.2);}',
+      '.dsh-ep-note{position:absolute;bottom:calc(100% + 8px);right:0;z-index:1100;display:flex;align-items:center;gap:8px;max-width:min(320px,70vw);padding:6px 8px 6px 10px;border-radius:8px;font-size:12px;line-height:18px;background:var(--dsw-alias-bg-overlay,Canvas);color:var(--dsw-alias-label-primary,CanvasText);border:1px solid var(--dsw-alias-border-l1,rgba(127,127,127,.35));box-shadow:0 4px 16px rgba(0,0,0,.2);}',
+      '.dsh-ep-note[data-tone="error"]{border-color:var(--dsw-alias-state-error-primary,rgba(214,73,73,.6));}',
       '.dsh-ep-note-text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
       '.dsh-ep-note-btn{flex:0 0 auto;border:none;background:transparent;color:var(--dsw-alias-state-business-primary,#4f7bd8);font-size:12px;line-height:18px;padding:0 2px;cursor:pointer;}',
       '.dsh-ep-note-close{flex:0 0 auto;border:none;background:transparent;color:inherit;opacity:.7;font-size:14px;line-height:18px;padding:0 2px;cursor:pointer;}',
@@ -247,7 +279,7 @@ window.__ModuleLoader__.load({
       const attachmentIds = inputState === undefined || !Array.isArray(inputState.attachmentIds) ? [] : inputState.attachmentIds;
 
       const [busy, setBusy] = React.useState(false);
-      /** null or { text, undo? } — undo holds the exact original semantic draft. */
+      /** null or { text, tone, undo? } — undo holds the exact original semantic draft. */
       const [note, setNote] = React.useState(null);
       const mounted = React.useRef(true);
       const busyRef = React.useRef(false);
@@ -270,14 +302,14 @@ window.__ModuleLoader__.load({
         if (mounted.current) setNote(null);
       };
 
-      const flash = (text, undo) => {
+      const flash = (text, undo, tone) => {
         if (!mounted.current) return;
         if (noteTimer.current !== null) clearTimeout(noteTimer.current);
-        setNote({ text, undo });
+        setNote({ text, tone, undo });
         noteTimer.current = setTimeout(() => {
           noteTimer.current = null;
           if (mounted.current) setNote(null);
-        }, undo === undefined ? 3500 : 12000);
+        }, undo === undefined ? 5000 : 12000);
       };
 
       /** Re-run after a programmatic draft replace: restore dropped attachments. */
@@ -330,7 +362,7 @@ window.__ModuleLoader__.load({
         }
         const prepared = prepare();
         if (prepared.error !== undefined) {
-          flash(prepared.error);
+          flash(prepared.error, undefined, 'error');
           return;
         }
 
@@ -346,14 +378,22 @@ window.__ModuleLoader__.load({
 
         void (async () => {
           try {
-            const response = await fetch(new URL(ROUTE, document.baseURI).toString(), {
-              method: 'POST',
-              headers: { 'content-type': 'application/json' },
-              body: JSON.stringify({ text: prepared.prompt }),
-              signal: request.signal,
-            });
+            let response;
+            try {
+              response = await fetch(new URL(ROUTE, document.baseURI).toString(), {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ text: prepared.prompt }),
+                signal: request.signal,
+                credentials: 'same-origin',
+              });
+            } catch (error) {
+              if (request.signal.aborted) throw error;
+              failure = t('offline');
+              throw error;
+            }
             let payload = null;
-            try { payload = await response.json(); } catch { /* non-JSON failure */ }
+            try { payload = await response.json(); } catch { /* non-JSON failure body */ }
             const code = payload !== null && typeof payload.code === 'string' ? payload.code : '';
             const serverMessage = payload !== null && typeof payload.message === 'string' ? payload.message.trim() : '';
             if (!response.ok) {
@@ -361,20 +401,29 @@ window.__ModuleLoader__.load({
               throw new Error('request-failed');
             }
             if (payload === null || typeof payload.text !== 'string' || payload.text.trim() === '') {
+              failure = t('emptyResult');
               throw new Error('empty-result');
             }
             if (!mounted.current || request.signal.aborted) return;
             const target = prepared.hasRefs ? rebuildSnapshot(payload.text, prepared.marks) : payload.text;
             if (target === null) {
-              flash(t('refLost'));
+              flash(t('refLost'), undefined, 'error');
               return;
             }
             if (latest.current.draft !== prepared.draftText || latest.current.rev !== prepared.revision) {
-              flash(t('changed'));
+              flash(t('changed'), undefined, 'error');
               return;
             }
             if (latest.current.phase !== 'plain' || typeof props.inputActions?.setDraft !== 'function') {
+              failure = t('notReady');
               throw new Error('draft-unavailable');
+            }
+            // Nothing to write back: keep the user's own wording and say so
+            // instead of flashing a success note over an identical draft.
+            const targetText = typeof target === 'string' ? target : target.text;
+            if (sameDraft(targetText, prepared.draftText)) {
+              flash(t('unchanged'));
+              return;
             }
             props.inputActions.setDraft(target);
             const kept = prepared.hasRefs || prepared.attachments.length > 0;
@@ -383,10 +432,10 @@ window.__ModuleLoader__.load({
           } catch {
             if (!mounted.current) return;
             if (request.signal.aborted) {
-              flash(timedOut ? t('timeout') : t('cancelled'));
+              flash(timedOut ? t('timeout') : t('cancelled'), undefined, 'error');
               return;
             }
-            flash(failure);
+            flash(failure, undefined, 'error');
           } finally {
             clearTimeout(timeout);
             if (controller.current === request) controller.current = null;
@@ -411,7 +460,7 @@ window.__ModuleLoader__.load({
         // The note stays in the accessibility tree so its Undo / Dismiss buttons
         // are reachable; only the text is hidden because the live region above
         // already announces it (avoids double speech).
-        note === null ? null : h('div', { className: 'dsh-ep-note' },
+        note === null ? null : h('div', { className: 'dsh-ep-note', 'data-tone': note.tone ?? 'info' },
           h('span', { className: 'dsh-ep-note-text', 'aria-hidden': 'true' }, note.text),
           note.undo !== undefined
             ? h('button', { type: 'button', className: 'dsh-ep-note-btn', onClick: undo }, t('undo'))
@@ -440,7 +489,7 @@ window.__ModuleLoader__.load({
         }, EnhanceButton));
       },
       /** Pure helpers exposed for offline logic tests; the Loader ignores extra exports. */
-      _internals: { orderedRefs, toSnapshot, splitForModel, rebuildSnapshot, restoreAttachments },
+      _internals: { orderedRefs, toSnapshot, splitForModel, rebuildSnapshot, restoreAttachments, sameDraft, messageFor },
     };
   },
 });

@@ -2,6 +2,25 @@
 
 All notable changes to this project are documented here.
 
+## [1.2.0] - 2026-11-18
+
+### Fixed
+- **Enhancement failed with a generic "请重试" for causes the user could act on.** The client now maps HTTP 401/403 to a re-login hint, 404/405 to "restart DSH", a dropped connection to an offline hint, and a Host 504 to a real timeout message. A non-JSON or empty success body no longer falls through to the retry copy.
+- **The client deadline was shorter than the Host's own budget.** The browser gave up at 60 s while the Host allowed 75 s per attempt, so a slow-but-successful rewrite reported a timeout. The client deadline is now 300 s, above three Host attempts at the shipped 75 s and at the 90 s a profile may raise it to.
+- **Output was padded with empty lines.** Models emit 3–5 blank lines between sections; the Host now collapses every run to exactly one blank line and trims trailing spaces.
+- **A reformatted marker cancelled the whole rewrite.** Models occasionally write `【DSH_REF_0】` or `[DSH_REF 0]`; the Host canonicalizes those variants back to `[[DSH_REF_0]]` before the integrity check instead of refusing with `references-lost`.
+- **`temperature` was hardcoded to 0.3.** Reasoning-only models reject that parameter. It is now a config value that defaults to empty, which omits the field entirely.
+- **An identical rewrite claimed success.** When the model returns the draft unchanged, the note now says the content was not modified instead of flashing "已替换为优化后的提示词".
+- **An oversized upload reset the connection instead of reporting the refusal.** The route answered 413 the moment the ceiling was crossed while the client was still uploading, so Node destroyed the socket: the browser saw a reset, and the next request on that keep-alive connection failed too. The remainder is now drained (up to 32 MiB) before answering, and a cut drain closes the connection explicitly.
+- **`timeoutMs` could be configured above the client deadline.** Clamped to 120 000 ms so three Host attempts still finish inside the client's wait.
+
+### Changed
+- Up to three bounded attempts for transient failures (`model-failed`, `empty-result`, `output-truncated`, `references-lost`, `reasoning-unsupported`). A truncation retries with the output cap doubled (capped at 64 000), a marker-loss retry appends an explicit repair instruction to the system prompt, and a rejected reasoning effort drops the inherited effort before the next attempt.
+- The client deadline is 300 s, above three Host attempts at the shipped 75 s and at the 90 s a profile may raise it to.
+- Request body ceiling raised to 2 MiB and `maxInputChars` to 32 000, so a long draft with a big attachment list is no longer refused at 8 000 characters.
+- Failure notes render with an error border and stay for 5 s (success notes keep 3.5 s); the Undo note still holds for 12 s.
+- Added `npm test`: `test/check.mjs` (26 offline checks over both halves, including the retry pipeline against a scripted `ctx.llm`) and `test/host-http.mjs` (12 checks that mount the real route on a real `http.Server`, covering the trust fence, body limits, keep-alive reuse and the marker-repair path).
+
 ## [1.1.0] - 2026-11-17
 
 ### Fixed

@@ -4,7 +4,7 @@ A DeepSeek Harness (DSH) Web GUI plugin. It adds a ✨ icon button to the compos
 
 **Only your typed text is enhanced; uploaded images, files and inline references are preserved** — nothing disappears or turns into a plain-text path.
 
-> Version 1.1.0 · Requires DSH 0.2.2-rc.2+ · No third-party dependencies, no build step
+> Version 1.2.0 · Requires DSH 0.2.2-rc.2+ · No third-party dependencies, no build step
 
 中文说明：[README.md](README.md)
 
@@ -93,22 +93,24 @@ Uses the deployment default model by default. To tune it, override by row id in 
   name: dsh-enhance-prompt
   config:
     structured: true          # true = sectioned; false = single paragraph
-    reasoningEffort: off      # off/low/high/max; off saves tokens
+    # reasoningEffort: low    # applies only when provider and model are both set
     # provider / model        # optionally point enhancement at a cheaper model
-    maxInputChars: 8000
-    maxOutputTokens: 2048
+    maxInputChars: 32000
+    maxOutputTokens: 4096
     timeoutMs: 75000
+    temperature: ''           # empty = omit the parameter (reasoning models need that)
     # system: 'custom system prompt'
 ```
 
 | Field | Default | Meaning |
 |---|---|---|
 | `structured` | `true` | Sectioned output |
-| `provider` / `model` | empty (default model) | Model route for enhancement |
-| `reasoningEffort` | inherited | `off`/`low` recommended |
-| `maxInputChars` | `8000` | Draft character cap |
-| `maxOutputTokens` | `2048` | Output token cap |
-| `timeoutMs` | `75000` | Host-side timeout |
+| `provider` / `model` | empty (default model) | Model route for enhancement; both must be set to also override `reasoningEffort` |
+| `reasoningEffort` | inherited | Only applies with an explicit route; must be a level the model declares, else `UNSUPPORTED_REASONING_EFFORT` |
+| `maxInputChars` | `32000` | Draft character cap |
+| `maxOutputTokens` | `4096` | Output token cap (doubled once on a truncation retry) |
+| `timeoutMs` | `75000` | Host-side timeout per attempt (up to 3 attempts; the client waits up to 300 s) |
+| `temperature` | empty | Empty omits the parameter; 0–2 sends it |
 | `system` | built-in | Fully override the system prompt |
 
 ## How it works
@@ -116,6 +118,14 @@ Uses the deployment default model by default. To tune it, override by row id in 
 - **Client**: registers a button in `conversation.input.right` (left of the model selector), reads `useInput()` draft/references/attachments and writes back via `inputActions.setDraft()`; within two paints it diffs and re-adds any dropped attachment ids via `addAttachments`.
 - **Transport**: `POST /__local/enhance-prompt`, fenced by DSH's `connection.requestRejection()`.
 - **Host**: calls the model with `ctx.llm.stream()`; each file/reference becomes an opaque `[[DSH_REF_n]]` marker the model must keep; the client rebuilds a semantic draft (`text + references`).
+- **Retry**: transient failures (`model-failed`, `empty-result`, `references-lost`, `output-truncated`, `reasoning-unsupported`) get up to three attempts; a truncation doubles the output cap, a lost marker appends a repair instruction to the system prompt, and a rejected inherited reasoning effort is dropped before the next attempt.
+- **Normalization**: models often rewrite `[[DSH_REF_0]]` as `【DSH_REF_0】` or leave 3–5 blank lines between sections, so the Host repairs markers and collapses blank runs to exactly one line before the integrity check.
+
+## Self-check
+
+```bash
+npm test              # 26 offline checks + 12 checks against a real http.Server
+```
 
 ## Known limitations
 

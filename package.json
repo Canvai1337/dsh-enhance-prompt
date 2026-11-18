@@ -1,6 +1,6 @@
 {
   "name": "dsh-enhance-prompt",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "type": "module",
   "description": "A composer button beside the model selector that rewrites your draft into a clear, sectioned prompt while keeping attached files as chips.",
@@ -12,6 +12,9 @@
     "composer"
   ],
   "license": "MIT",
+  "scripts": {
+    "test": "node test/check.mjs && node test/host-http.mjs"
+  },
   "exports": {
     ".": "./index.js",
     "./client": "./client.js",
@@ -28,6 +31,7 @@
     "LICENSE",
     "CHANGELOG.md",
     "examples",
+    "test",
     "icon.svg"
   ],
   "dsh": {

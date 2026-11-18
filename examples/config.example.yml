@@ -6,15 +6,19 @@
   config:
     # true = sectioned output (labels + lists); false = one paragraph
     structured: true
-    # Use the cheapest effort for a rewrite task (off / low / high / max)
-    reasoningEffort: off
+    # Cheapest effort is usually enough for a rewrite (off / low / high / max).
+    # Leave it out when the selected model does not expose reasoning efforts.
+    # reasoningEffort: low
     # Optional: run enhancement on a specific, cheaper model
     # provider: magpie
-    # model: workbuddy/deepseek-v4.1-flash
+    # model: auto/deepseek-v4.1-flash
     # Draft and output bounds
-    maxInputChars: 8000
-    maxOutputTokens: 2048
+    maxInputChars: 32000
+    maxOutputTokens: 4096
     timeoutMs: 75000
+    # Empty omits `temperature` entirely, which reasoning models often require.
+    # Set a number (0-2) only for providers that accept it on this model.
+    temperature: ''
     # Fully custom system prompt (overrides the built-in one)
     # system: |
     #   You are a prompt rewriter...

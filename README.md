@@ -4,7 +4,7 @@
 
 **你手打的文字被增强；上传的图片、文件和内联引用都会原样保留**，不会消失，也不会变成纯文字路径。
 
-> 版本 1.1.0 · 需要 DSH 0.2.2-rc.2+ · 无第三方依赖、无需构建
+> 版本 1.2.0 · 需要 DSH 0.2.2-rc.2+ · 无第三方依赖、无需构建
 
 English: [README.en.md](README.en.md)
 
@@ -96,22 +96,24 @@ English: [README.en.md](README.en.md)
   name: dsh-enhance-prompt
   config:
     structured: true          # true=分段结构化；false=单段落式
-    reasoningEffort: off      # off/low/high/max；改写任务用 off 更省
+    # reasoningEffort: low    # 只有 provider/model 同时写死时才生效；模型不支持就别写
     # provider / model        # 可选：指定更便宜的模型跑增强
-    maxInputChars: 8000
-    maxOutputTokens: 2048
+    maxInputChars: 32000
+    maxOutputTokens: 4096
     timeoutMs: 75000
+    temperature: ''           # 留空=不发送该参数（推理模型通常要求如此）
     # system: '自定义系统提示词'
 ```
 
 | 字段 | 默认 | 说明 |
 |---|---|---|
 | `structured` | `true` | 是否输出分段结构 |
-| `provider` / `model` | 空（用默认模型） | 增强用的模型路由 |
-| `reasoningEffort` | 继承默认 | 建议 `off`/`low` |
-| `maxInputChars` | `8000` | 草稿字符上限 |
-| `maxOutputTokens` | `2048` | 输出 token 上限 |
-| `timeoutMs` | `75000` | Host 端超时 |
+| `provider` / `model` | 空（用默认模型） | 增强用的模型路由；两者都写才会覆盖 `reasoningEffort` |
+| `reasoningEffort` | 继承默认 | 只在显式路由时生效；取值必须在该模型声明的档位里，否则报 `UNSUPPORTED_REASONING_EFFORT` |
+| `maxInputChars` | `32000` | 草稿字符上限 |
+| `maxOutputTokens` | `4096` | 输出 token 上限（被截断时自动翻倍重试一次） |
+| `timeoutMs` | `75000` | Host 端单次尝试超时（最多 3 次尝试，客户端等待上限 300s） |
+| `temperature` | 空 | 空=不发送该参数；填 0–2 才发给模型 |
 | `system` | 内置 | 完全自定义系统提示词 |
 
 ## 工作原理
@@ -119,6 +121,14 @@ English: [README.en.md](README.en.md)
 - **前端**：在 `conversation.input.right` 插槽注册按钮（正好在模型选择左侧）；读 `useInput()` 的草稿/引用/附件，写回用 `inputActions.setDraft()`；写回后 2 帧内对 `addAttachments` 做一次差集补回。
 - **传输**：`POST /__local/enhance-prompt`，由 DSH `connection.requestRejection()` 做同源+登录校验。
 - **后端**：`ctx.llm.stream()` 调默认模型；文件/引用在请求中以 `[[DSH_REF_n]]` 表示，模型不得改动标记；返回后重建语义草稿（`text + references`）。
+- **失败重试**：瞬时失败（`model-failed` / `empty-result` / `references-lost` / `output-truncated` / `reasoning-unsupported`）最多尝试 3 次；截断时把输出上限翻倍，标记丢失时在系统提示词末尾追加标记修复指令，模型不支持继承来的推理档位时自动去掉该参数重试。
+- **归一化**：模型常把 `[[DSH_REF_0]]` 写成 `【DSH_REF_0】` 或多空 3–5 行，Host 会先修复标记、再把连续空行压成恰好一行，之后才做标记完整性校验。
+
+## 自检
+
+```bash
+npm test              # 26 项离线检查 + 12 项真实 HTTP 检查
+```
 
 ## 已知限制
 
@@ -138,6 +148,8 @@ enhance-prompt/
 ├── locale/{zh,en}.json     # 插件标题/描述
 ├── icon.svg                # 插件图标
 ├── examples/config.example.yml
+├── test/check.mjs          # 纯函数与重试流水线自检
+├── test/host-http.mjs      # 真 http.Server 上的路由/限流/keep-alive 自检
 ├── README.md / README.en.md
 ├── CHANGELOG.md
 └── LICENSE
